@@ -35,23 +35,9 @@ The extension API does not provide a universal feed of every Cursor AI chat prom
 
 Filesystem polling remains supporting evidence only: a file changing while Cursor is open does not prove Cursor itself caused the change.
 
-## Ubuntu requirements
-
-```bash
-sudo apt update
-sudo apt install -y python3 python3-venv python3-pip xprintidle
-```
-
 ## Install
 
-Extract the ZIP and enter its folder:
-
-```bash
-unzip cursor-only-activity-tracker-ubuntu.zip
-cd cursor-only-activity-tracker
-chmod +x scripts/*.sh
-./scripts/install.sh
-```
+Step-by-step Ubuntu commands are in [INSTALL.md](INSTALL.md). Install the Cursor Timelog MCP before this dashboard.
 
 Configure the directories that contain your Cursor projects:
 
