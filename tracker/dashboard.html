@@ -1,0 +1,71 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Activity Tracker</title><style>
+:root{--bg:#f3f7f8;--card:#fff;--ink:#19313a;--muted:#71828a;--line:#e3ebee;--teal:#147b80}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Inter,system-ui,sans-serif}header{background:white;border-bottom:1px solid var(--line);padding:18px max(20px,calc((100% - 1240px)/2));font-weight:750;font-size:18px}header span{color:var(--teal)}main{max-width:1240px;margin:28px auto;padding:0 20px}.head{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}h1{font-size:27px;margin:0}h3{margin:0}.muted{color:var(--muted);font-size:12px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:20px 0}.card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px;box-shadow:0 7px 24px #143e4a0a}.metric{font-size:27px;font-weight:750}.label{font-size:12px;color:var(--muted);font-weight:650}button,.btn{border:0;border-radius:8px;padding:10px 14px;background:var(--teal);color:white;font-weight:650;cursor:pointer;text-decoration:none}.secondary{background:#edf3f4;color:#29444d}button:disabled{opacity:.6;cursor:wait}.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}input,select{border:1px solid var(--line);border-radius:8px;padding:9px;background:white;font:inherit}input[type=date]{min-width:160px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 9px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:11px;color:var(--muted);text-transform:uppercase}td{font-size:13px}.wrap{overflow:auto}.pill{background:#eaf5f3;color:#176d6d;border-radius:20px;padding:3px 8px;font-size:11px}.warn{background:#fff3dd;color:#946114}.note{margin:14px 0;padding:12px;border:1px solid #f0dfb8;background:#fff9e9;border-radius:9px;color:#73531c;font-size:12px}.small{padding:6px 9px;font-size:11px}.empty{text-align:center;padding:25px;color:var(--muted)}.block{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}.block:first-child{border-top:0;padding-top:0;margin-top:0}.error{margin:0 0 12px;padding:10px 12px;border-radius:8px;background:#fdecec;color:#8a2a2a}#toast{position:fixed;bottom:20px;right:20px;background:#173b43;color:white;padding:12px;border-radius:8px;display:none}@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:480px){.grid{grid-template-columns:1fr 1fr}main{padding:0 12px}}
+</style></head><body><header>◉ <span>Activity</span> Tracker <small class="muted"> · daily timelog</small></header><main>
+<div class="head"><div><h1>Daily overview</h1><div class="muted" id="date"></div></div><div><button id="gen" type="button">Generate Today's Timelog</button> <button id="csv" class="secondary" type="button">Export CSV</button></div></div>
+<div class="grid"><div class="card"><div class="label">Tasks</div><div class="metric" id="tasks">—</div></div><div class="card"><div class="label">Hours</div><div class="metric" id="hours">—</div></div><div class="card"><div class="label">Projects</div><div class="metric" id="projects">—</div></div><div class="card"><div class="label">To confirm</div><div class="metric" id="pending">—</div></div></div>
+<div class="note" id="note">Hours are approximate and come from the connected activity source. They are not verified billable time.</div>
+<section class="card"><div class="head"><h3>Timelog</h3><button id="copy-all" class="small secondary" type="button">Copy all</button></div>
+<div class="filters"><label class="muted" for="day">Date</label><input id="day" type="date" title="Choose a date"><label class="muted" for="project">Project</label><select id="project"><option value="">All projects</option></select></div>
+<div id="message"></div><div id="report"><p class="empty">Choose a date or generate today's timelog.</p></div>
+</section></main><div id="toast"></div><script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let report=null, loading=false;
+function todayISO(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function showDate(iso){const [y,m,d]=iso.split('-').map(Number);$('date').textContent=new Date(y,m-1,d).toLocaleDateString(undefined,{dateStyle:'full'})}
+function toast(t, ok=true){const el=$('toast');el.textContent=t;el.style.background=ok?'#173b43':'#8a2a2a';el.style.display='block';setTimeout(()=>el.style.display='none',3200)}
+async function api(url){const r=await fetch(url);if(!r.ok)throw Error((await r.text())||'Request failed');return r.json()}
+function visible(){if(!report)return [];const name=$('project').value;return report.projects.filter(p=>!name||p.project===name)}
+function textFor(projects){
+ const lines=['Timelog for '+((report.weekday?report.weekday+', ':'')+report.date),''];
+ if(!projects.length){lines.push('No activity was recorded for this date.');return lines.join('\n')}
+ projects.forEach(p=>{lines.push('Project: '+p.project);p.tasks.forEach(t=>{lines.push((t.time||'Time not recorded')+' — '+t.hours_label);lines.push(t.description);lines.push('')});lines.push('')});
+ const known=projects.flatMap(p=>p.tasks).filter(t=>t.hours!=null);
+ const missing=projects.flatMap(p=>p.tasks).some(t=>t.hours==null);
+ const total=known.reduce((s,t)=>s+t.hours,0);
+ lines.push('Total: '+(known.length?total.toFixed(2)+' h':'To be confirmed')+(missing&&known.length?' plus items still to be confirmed':'')+' (approximate)');
+ if(report.coverage_note)lines.push('',report.coverage_note);
+ return lines.join('\n');
+}
+function taskText(project,task){return 'Project: '+project+'\n'+(task.time||'Time not recorded')+' — '+task.hours_label+'\n'+task.description}
+async function copyText(text){try{await navigator.clipboard.writeText(text);toast('Copied')}catch(e){toast('Could not copy. Select the text and copy it manually.',false)}}
+function render(){
+ if(!report)return;
+ const projects=visible();
+ const tasks=projects.flatMap(p=>p.tasks);
+ const known=tasks.filter(t=>t.hours!=null);
+ $('tasks').textContent=tasks.length;
+ $('hours').textContent=known.length?known.reduce((s,t)=>s+t.hours,0).toFixed(2)+'h':'—';
+ $('projects').textContent=projects.length;
+ $('pending').textContent=tasks.filter(t=>t.hours==null).length;
+ $('note').innerHTML='<b>Source:</b> connected activity MCP'+(report.timezone?' · '+esc(report.timezone):'')+'<br>'+(report.coverage_note?esc(report.coverage_note):'Hours are approximate and are not verified billable time.');
+ if(!projects.length){$('report').innerHTML='<p class="empty">No activity was recorded for this date'+( $('project').value?' and project':'')+'.</p>';return}
+ $('report').innerHTML=projects.map((p,pi)=>`<div class="block"><div class="head"><h3>${esc(p.project)} <span class="muted">${esc(p.total_label)}</span></h3><button class="small secondary" type="button" data-copy="project" data-p="${pi}">Copy project</button></div><div class="wrap"><table><thead><tr><th>Time</th><th>Activity</th><th>Hours</th><th></th></tr></thead><tbody>${p.tasks.map((t,ti)=>`<tr><td>${esc(t.time||'—')}${t.category?`<div class="muted">${esc(t.category)}</div>`:''}</td><td>${esc(t.description)}</td><td><span class="pill ${t.hours==null?'warn':''}">${esc(t.hours_label)}</span></td><td><button class="small secondary" type="button" data-copy="task" data-p="${pi}" data-t="${ti}">Copy</button></td></tr>`).join('')}</tbody></table></div></div>`).join('');
+}
+async function loadTimelog(){
+ if(loading)return; loading=true;
+ const day=$('day').value||todayISO(); $('day').value=day; showDate(day);
+ const button=$('gen'); button.disabled=true; button.textContent='Generating…';
+ $('message').innerHTML=''; $('report').innerHTML='<p class="empty">Generating timelog…</p>';
+ const keep=$('project').value;
+ try{
+  report=await api('/api/timelog?day='+encodeURIComponent(day));
+  const names=report.project_names||[];
+  $('project').innerHTML='<option value="">All projects</option>'+names.map(n=>`<option>${esc(n)}</option>`).join('');
+  $('project').value=names.includes(keep)?keep:'';
+  render();
+  toast(report.empty?'No activity for '+day:'Timelog ready for '+day);
+ }catch(e){
+  report=null; $('report').innerHTML='';
+  $('message').innerHTML='<div class="error">'+esc(e.message)+'</div>';
+  toast('Could not generate the timelog', false);
+ }finally{loading=false; button.disabled=false; button.textContent="Generate Today's Timelog"}
+}
+$('gen').onclick=()=>{$('day').value=todayISO();$('project').value='';loadTimelog()};
+$('day').onchange=()=>{$('project').value='';loadTimelog()};
+$('project').onchange=render;
+$('copy-all').onclick=()=>{if(!report){toast('Generate a timelog first',false);return}copyText(textFor(visible()))};
+$('report').onclick=e=>{const b=e.target.closest('[data-copy]');if(!b||!report)return;const p=visible()[Number(b.dataset.p)];if(!p)return;if(b.dataset.copy==='project')copyText(textFor([p]));else copyText(taskText(p.project,p.tasks[Number(b.dataset.t)]))};
+$('csv').onclick=()=>{const day=$('day').value||todayISO();const q=new URLSearchParams({day});if($('project').value)q.set('project',$('project').value);window.location='/api/timelog.csv?'+q};
+$('day').value=todayISO(); showDate(todayISO()); loadTimelog();
+</script></body></html>

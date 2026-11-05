@@ -1,0 +1,12 @@
+{
+  "name": "cursor-local-activity-collector",
+  "displayName": "Cursor Local Activity Collector",
+  "description": "Sends local Cursor workspace and activity metadata to the private local timelog dashboard.",
+  "version": "1.1.0",
+  "publisher": "local-activity-tools",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "main": "./extension.js",
+  "activationEvents": ["*"],
+  "extensionKind": ["workspace"]
+}

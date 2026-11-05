@@ -1,0 +1,14 @@
+[Unit]
+Description=Cursor-Only Activity Tracker and Dashboard
+After=graphical-session.target
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/.config/cursor-only-activity-tracker/.env
+WorkingDirectory=%h/.local/share/cursor-only-activity-tracker/app
+ExecStart=%h/.local/share/cursor-only-activity-tracker/venv/bin/python -m tracker
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
